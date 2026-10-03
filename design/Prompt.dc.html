@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>系统提示词与任务设置</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div class="app {{theme}}">
+<div class="aurora"></div>
+<div class="win">
+  <div class="tb">
+    <div class="dots"><i></i><i></i><i></i></div>
+    <h1>提示词模板</h1>
+    <div class="sp"></div>
+    <button class="btn">试运行</button>
+    <button class="btn pri">保存模板</button>
+    <button class="ib" aria-label="切换明暗主题"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/></svg></button>
+  </div>
+  <div class="body">
+    <div class="side" style="width:280px">
+      <div class="lab">我的模板</div>
+      <div class="mt on"><b>面试复盘与评分</b><span>每 5 分钟 · 含条件筛选</span></div>
+      <div class="mt"><b>项目周会纪要</b><span>每 5 分钟 · 待办与结论</span></div>
+      <div class="mt"><b>客户访谈</b><span>每 10 分钟 · 需求与异议</span></div>
+      <div class="mt"><b>自定义</b><span>空白模板</span></div>
+      <button class="btn" style="margin-top:8px"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新建模板</button>
+      <div class="stat">
+        <div><span>阶段整理间隔</span><b>5 分钟</b></div>
+        <div><span>整理模型</span><b>云端 · 可换</b></div>
+        <div><span>密钥存储</span><b>系统钥匙串</b></div>
+      </div>
+    </div>
+
+    <div style="flex:1;min-width:0;padding:24px 28px;display:flex;flex-direction:column;gap:18px">
+      <div><h2 class="h2">面试复盘与评分</h2><div class="cap" style="margin-top:4px">系统提示词决定 AI 如何整理每个 5 分钟阶段，以及会议结束后的最终输出。</div></div>
+      <div class="fld"><label>主题任务</label>
+        <div class="inp f" style="height:112px">你是一名资深技术面试记录员。会议为「后端工程师」岗位面试，请持续记录候选人的项目经历、技术细节、量化成果与回答中的不足，
+并标注面试官尚未追问的点，便于面试后复盘。</div></div>
+      <div class="fld"><label>最终输出要求</label>
+        <div class="inp" style="height:112px">1. 整体总结（不超过 200 字）
+2. 按维度打分（1–5）：技术深度 / 系统设计 / 沟通 / 稳定性，并附证据原话
+3. 指定条件筛选结果，逐条给出「符合 / 不符合 / 未提及」
+4. 附：原始转写与纠错后全文</div></div>
+      <div class="fld"><label>筛选条件（会议结束时逐条判定）</label>
+        <table class="tbl card" style="border-radius:14px;overflow:hidden;box-shadow:none">
+          <tr><th>条件</th><th>判定方式</th><th>权重</th></tr>
+          <tr><td>3 年以上后端经验</td><td>候选人自述年限 ≥ 3</td><td>必须</td></tr>
+          <tr><td>有 Rust 或 Go 生产经验</td><td>提到并描述过线上项目</td><td>加分</td></tr>
+          <tr><td>能量化项目成果</td><td>至少一处具体数字</td><td>加分</td></tr>
+        </table></div>
+      <div style="display:flex;gap:12px;align-items:center"><span class="chip acc">变量 {会议主题}</span><span class="chip acc">{阶段起止}</span><span class="chip acc">{热词表}</span><div class="sp"></div><span class="cap">已输入 386 字 · 自动保存于 1 秒前</span></div>
+    </div>
+
+    <div style="width:400px;flex:none;padding:24px 28px 24px 0;display:flex;flex-direction:column;gap:12px">
+      <div class="h3">输出预览</div>
+      <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px;flex:1">
+        <div class="seg" style="align-self:flex-start"><span class="on">阶段纪要</span><span>最终报告</span></div>
+        <div class="cap">第 3 段 · 00:10–00:15（示例）</div>
+        <div class="sm" style="padding:0"><ul>
+          <li><b>项目经历：</b>负责订单履约链路，团队 8 人。</li>
+          <li><b>技术细节：</b>Kafka 分区按订单号哈希，幂等消费。</li>
+          <li><b>不足：</b>未说明如何处理重复消息的兜底。</li>
+        </ul></div>
+        <div style="height:1px;background:var(--line)"></div>
+        <div class="h3">筛选进度</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between"><span>3 年以上后端经验</span><span class="tag g">符合</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Rust 或 Go 生产经验</span><span class="tag g">符合</span></div>
+          <div style="display:flex;justify-content:space-between"><span>能量化项目成果</span><span class="tag k">未提及</span></div>
+        </div>
+      </div>
+      <div class="card" style="padding:14px 16px;display:flex;gap:12px;align-items:center"><div class="sw"></div><div><div class="h3">阶段整理携带前文摘要</div><div class="cap">每段带上上一段结论，保持上下文连贯</div></div></div>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"light"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'light' }; }
+}
+</script>
+</body>
+</html>

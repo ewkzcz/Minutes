@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>实时纪要主界面</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0}</style>
+</helmet>
+<div class="app {{theme}}">
+<div class="aurora"></div>
+<div class="win">
+  <div class="tb">
+    <div class="dots"><i></i><i></i><i></i></div>
+    <h1>后端工程师 · 二面</h1>
+    <span class="rec"><b></b>录制中 00:42:18</span>
+    <div class="sp"></div>
+    <span class="chip acc">模板 · 面试复盘</span>
+    <button class="ib" aria-label="切换明暗主题"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg></button>
+    <button class="ib" aria-label="设置"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
+  </div>
+  <div class="body">
+    <div class="side">
+      <button class="btn pri" style="margin-bottom:8px"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新建会议</button>
+      <div class="nav on"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>实时记录<small>进行中</small></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>历史会议<small>28</small></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h6"/></svg>提示词模板<small>4</small></div>
+      <div class="lab">今天</div>
+      <div class="mt on"><b>后端工程师 · 二面</b><span>进行中 · 42 分钟</span></div>
+      <div class="mt"><b>后端工程师 · 一面</b><span>10:00 · 已整理 · 平均分 3.8</span></div>
+      <div class="mt"><b>产品评审周会</b><span>昨天 · 已整理</span></div>
+      <div class="stat">
+        <div><span>语音识别</span><b>本地 · 流式</b></div>
+        <div><span>AI 整理</span><b>云端模型</b></div>
+        <div><span>本机识别占用</span><b>CPU 11%</b></div>
+        <div class="bar"><i style="width:11%"></i></div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="hd">
+        <h2 class="h2">实时转写</h2>
+        <span class="chip ok">实时纠错 已开启</span>
+        <span class="chip">热词 · Kafka / Rust / K8s +12</span>
+        <div class="sp"></div>
+        <div class="seg"><span class="on">纠错后</span><span>对照</span><span>原始</span></div>
+      </div>
+      <div class="wavebox">
+        <svg viewBox="0 0 24 24" width="20" height="20" style="stroke:var(--acc);fill:none;stroke-width:1.8;stroke-linecap:round;flex:none"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <div class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <span class="cap">MacBook 麦克风 + 系统音频</span>
+      </div>
+      <div class="tr">
+        <div class="ln"><div class="av a">面</div><div><div class="m"><b>面试官</b>00:39:52</div><p>那你们线上的消息队列是怎么选型的？当时为什么没有用 RabbitMQ？</p></div></div>
+        <div class="ln"><div class="av b">候</div><div><div class="m"><b>候选人</b>00:40:07<span class="chip acc" style="height:20px;font-size:11px">已纠错 3 处</span></div><p>我们用的是 <del>卡夫卡</del><ins>Kafka</ins>，主要是吞吐量的考虑，日均消息大概两亿条。服务是用 <del>锐斯特</del><ins>Rust</ins> 重写的，部署在 <del>K八S</del><ins>K8s</ins> 上，延迟从 120 毫秒降到了 30 毫秒。</p></div></div>
+        <div class="ln"><div class="av a">面</div><div><div class="m"><b>面试官</b>00:41:26</div><p>重写的时候怎么保证数据一致性？有没有做灰度？</p></div></div>
+        <div class="ln cur"><div class="av b">候</div><div><div class="m"><b>候选人</b>00:41:48<span class="chip warn" style="height:20px;font-size:11px">识别中</span></div><p class="part">我们是双写加对账的方式，先灰度百分之五的流量，然后逐步放开，中间</p></div></div>
+      </div>
+      <div class="card ctl">
+        <button class="rbtn" aria-label="结束录制"><i></i></button>
+        <button class="btn">暂停</button>
+        <button class="btn"><svg viewBox="0 0 24 24"><path d="M5 21V4M5 5h12l-2 4 2 4H5"/></svg>标记要点</button>
+        <button class="btn"><svg viewBox="0 0 24 24"><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></svg>立即整理</button>
+        <div class="sp"></div>
+        <span class="cap">已识别 6,420 字 · 已纠错 47 处</span>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="card next">
+        <div class="ring"><span>3:12</span></div>
+        <div style="flex:1"><div class="h3">下一次阶段整理</div><div class="cap">每 5 分钟自动 · 基于面试复盘模板</div></div>
+        <span class="chip acc">5 分钟</span>
+      </div>
+      <div class="seg" style="align-self:flex-start"><span class="on">阶段纪要</span><span>关键点</span><span>候选人评分</span></div>
+      <div class="sums">
+        <div class="card sm now">
+          <div class="top"><span class="tag k">第 8 段</span><span class="h3">00:35 – 00:40</span><span class="sp"></span><span class="chip ok">刚整理</span></div>
+          <ul>
+            <li><b>系统设计：</b>主导消息平台从 RabbitMQ 迁移至 Kafka，日均 2 亿条。</li>
+            <li><b>性能：</b>Rust 重写后延迟 120ms → 30ms，有量化数据。</li>
+            <li><b>不足：</b>对一致性方案描述偏笼统，未提对账细节。</li>
+          </ul>
+        </div>
+        <div class="card sm">
+          <div class="top"><span class="tag k">第 7 段</span><span class="h3">00:30 – 00:35</span></div>
+          <ul>
+            <li><b>项目背景：</b>电商履约系统，团队 8 人，负责核心链路。</li>
+            <li><b>亮点：</b>主动推动监控告警体系，故障恢复时间缩短一半。</li>
+          </ul>
+        </div>
+        <div class="card sm">
+          <div class="top"><span class="tag r">待追问</span><span class="h3">一致性与灰度回滚</span></div>
+          <ul><li>是否演练过回滚？对账不一致时的处理流程？</li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'dark' }; }
+}
+</script>
+</body>
+</html>

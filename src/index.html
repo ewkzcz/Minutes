@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Minutes</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <header class="tb" data-tauri-drag-region>
+    <div class="tb-title" data-tauri-drag-region></div>
+    <div class="tb-rec" id="tbRec" hidden></div>
+    <div class="sp" data-tauri-drag-region></div>
+    <button class="ib" id="themeBtn" title="切换明暗主题" aria-label="切换明暗主题"></button>
+  </header>
+  <div class="body">
+    <nav class="side" id="side"></nav>
+    <main class="main" id="main"></main>
+  </div>
+  <div class="toasts" id="toasts"></div>
+  <div class="modal-root" id="modal"></div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

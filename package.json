@@ -1,0 +1,15 @@
+{
+  "name": "minutes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "实时会议语音纪要桌面应用（Tauri 2）",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "preview": "python3 -m http.server 1420 --directory src",
+    "check": "cargo check --manifest-path src-tauri/Cargo.toml"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

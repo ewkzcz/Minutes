@@ -7,6 +7,7 @@ export const S = {
   llmModels: [],
   devices: [],
   templates: [],
+  books: [],         // 专有词库（含绑定的模板 id）
   sessionCount: 0,
   live: {
     state: 'idle',    // idle | recording | paused | reconnecting | finalizing
@@ -17,6 +18,9 @@ export const S = {
   go: () => {},        // 由 main.js 注入
   refreshNav: () => {},
 };
+
+/** 某模板录制时使用的词库：已启用，且绑定了该模板或未绑定任何模板（通用）。 */
+export const booksFor = (tid) => S.books.filter((b) => b.enabled && (!b.template_ids.length || b.template_ids.includes(tid)));
 
 export const isLive = () => S.live.state !== 'idle';
 export const elapsed = () => {

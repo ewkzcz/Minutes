@@ -86,13 +86,23 @@ impl Template {
     }
 }
 
-/// 已启用的专有词，作为上下文纠错的依据。
-pub fn load_terms(db: &Db) -> Vec<String> {
-    db.query("SELECT term FROM lexicon WHERE enabled=1 ORDER BY id", &[])
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|r| r["term"].as_str().map(str::trim).filter(|t| !t.is_empty()).map(String::from))
-        .collect()
+/// 本场会议使用的专有词：已启用词库中的已启用词条，词库须绑定了该模板或未绑定任何模板（通用）。
+pub fn load_terms(db: &Db, template_id: i64) -> Vec<String> {
+    let rows = db
+        .query(
+            "SELECT l.term FROM lexicon l JOIN lexicon_books b ON b.id=l.book_id \
+             WHERE l.enabled=1 AND b.enabled=1 AND (NOT EXISTS (SELECT 1 FROM template_books t WHERE t.book_id=b.id) \
+             OR EXISTS (SELECT 1 FROM template_books t WHERE t.book_id=b.id AND t.template_id=?)) ORDER BY b.id, l.id",
+            &[&template_id],
+        )
+        .unwrap_or_default();
+    let mut out: Vec<String> = vec![];
+    for t in rows.iter().filter_map(|r| r["term"].as_str().map(str::trim)) {
+        if !t.is_empty() && !out.iter().any(|x| x.eq_ignore_ascii_case(t)) {
+            out.push(t.to_string());
+        }
+    }
+    out
 }
 
 // ---------------------------------------------------------------- 阶段整理 / 最终总结
@@ -347,7 +357,7 @@ impl Engine {
             db: self.db.clone(),
             emit: self.emit.clone(),
             llm: Llm::new(settings.llm_url(), settings.api_key.clone()),
-            terms: load_terms(&self.db),
+            terms: load_terms(&self.db, trow["id"].as_i64().unwrap_or(0)),
             settings,
             sid,
             template,
@@ -468,4 +478,31 @@ async fn run(ctx: Arc<Ctx>, mut audio_rx: mpsc::UnboundedReceiver<Vec<u8>>, mut 
         }
     }
     let _ = ctx.db.exec("UPDATE sessions SET status='done', ended_at=?, duration_ms=? WHERE id=?", &[&(started_ms + duration), &duration, &ctx.sid]);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn terms_follow_book_switch_and_binding() {
+        let path = std::env::temp_dir().join(format!("minutes-test-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        {
+            // 旧版库：只有词条，没有词库
+            let c = rusqlite::Connection::open(&path).unwrap();
+            c.execute_batch("CREATE TABLE lexicon (id INTEGER PRIMARY KEY AUTOINCREMENT, term TEXT NOT NULL, misspellings TEXT NOT NULL DEFAULT '', weight TEXT NOT NULL DEFAULT 'mid', enabled INTEGER NOT NULL DEFAULT 1, note TEXT NOT NULL DEFAULT ''); INSERT INTO lexicon(term) VALUES('Kafka');").unwrap();
+        }
+        let db = Db::open(&path).unwrap();
+        assert_eq!(load_terms(&db, 1), vec!["Kafka"]); // 迁入「默认词库」，通用
+        let b = db.insert("INSERT INTO lexicon_books(name) VALUES('面试')", &[]).unwrap();
+        db.exec("INSERT INTO lexicon(term,book_id) VALUES('灰度发布',?),('kafka',?)", &[&b, &b]).unwrap();
+        db.exec("INSERT INTO template_books(template_id,book_id) VALUES(1,?)", &[&b]).unwrap();
+        assert_eq!(load_terms(&db, 1), vec!["Kafka", "灰度发布"]); // 绑定 + 通用，去重
+        assert_eq!(load_terms(&db, 2), vec!["Kafka"]); // 未绑定模板 2
+        db.exec("UPDATE lexicon_books SET enabled=0 WHERE id=?", &[&b]).unwrap();
+        assert_eq!(load_terms(&db, 1), vec!["Kafka"]); // 停用词库
+        drop(db);
+        let _ = std::fs::remove_file(&path);
+    }
 }

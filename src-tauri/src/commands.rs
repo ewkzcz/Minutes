@@ -173,21 +173,79 @@ pub fn session_markdown(app: State<App>, id: i64, opts: Value) -> R<String> {
 
 // ------------------------------------------------------------ 词库
 
+/// 词库列表，附词条数与绑定的模板 id。
 #[tauri::command]
-pub fn lexicon_list(app: State<App>) -> R<Vec<Value>> {
-    app.db.query("SELECT id,term,enabled FROM lexicon ORDER BY id DESC", &[]).map_err(e)
+pub fn books_list(app: State<App>) -> R<Vec<Value>> {
+    let rows = app
+        .db
+        .query(
+            "SELECT b.id,b.name,b.enabled,(SELECT COUNT(*) FROM lexicon WHERE book_id=b.id) AS n,\
+             (SELECT group_concat(template_id) FROM template_books WHERE book_id=b.id) AS tids FROM lexicon_books b ORDER BY b.id",
+            &[],
+        )
+        .map_err(e)?;
+    Ok(rows
+        .into_iter()
+        .map(|mut r| {
+            let tids: Vec<i64> = r["tids"].as_str().unwrap_or("").split(',').filter_map(|x| x.parse().ok()).collect();
+            r["template_ids"] = json!(tids);
+            r.as_object_mut().unwrap().remove("tids");
+            r
+        })
+        .collect())
 }
 
-/// 批量添加：按换行、逗号、顿号、分号等分隔，已存在的词（英文忽略大小写）跳过。返回 [新增数, 跳过数]。
 #[tauri::command]
-pub fn lexicon_add(app: State<App>, text: String) -> R<(usize, usize)> {
-    let exist: Vec<String> = app.db.query("SELECT term FROM lexicon", &[]).map_err(e)?.iter().filter_map(|r| r["term"].as_str().map(str::to_lowercase)).collect();
+pub fn book_save(app: State<App>, id: Option<i64>, name: String) -> R<i64> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("词库名称不能为空".into());
+    }
+    match id {
+        Some(id) => {
+            app.db.exec("UPDATE lexicon_books SET name=? WHERE id=?", &[&name, &id]).map_err(e)?;
+            Ok(id)
+        }
+        None => app.db.insert("INSERT INTO lexicon_books(name) VALUES(?)", &[&name]).map_err(e),
+    }
+}
+
+#[tauri::command]
+pub fn book_toggle(app: State<App>, id: i64, enabled: bool) -> R<()> {
+    app.db.exec("UPDATE lexicon_books SET enabled=? WHERE id=?", &[&(enabled as i64), &id]).map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn book_delete(app: State<App>, id: i64) -> R<()> {
+    app.db.exec("DELETE FROM lexicon WHERE book_id=?", &[&id]).map_err(e)?;
+    app.db.exec("DELETE FROM template_books WHERE book_id=?", &[&id]).map_err(e)?;
+    app.db.exec("DELETE FROM lexicon_books WHERE id=?", &[&id]).map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn book_bind(app: State<App>, book_id: i64, template_id: i64, bound: bool) -> R<()> {
+    let sql = if bound { "INSERT OR IGNORE INTO template_books(template_id,book_id) VALUES(?,?)" } else { "DELETE FROM template_books WHERE template_id=? AND book_id=?" };
+    app.db.exec(sql, &[&template_id, &book_id]).map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn lexicon_list(app: State<App>, book_id: i64) -> R<Vec<Value>> {
+    app.db.query("SELECT id,term,enabled FROM lexicon WHERE book_id=? ORDER BY id DESC", &[&book_id]).map_err(e)
+}
+
+/// 批量添加到指定词库：按换行、逗号、顿号、分号等分隔，本词库已有的词（英文忽略大小写）跳过。返回 [新增数, 跳过数]。
+#[tauri::command]
+pub fn lexicon_add(app: State<App>, book_id: i64, text: String) -> R<(usize, usize)> {
+    let exist: Vec<String> = app.db.query("SELECT term FROM lexicon WHERE book_id=?", &[&book_id]).map_err(e)?.iter().filter_map(|r| r["term"].as_str().map(str::to_lowercase)).collect();
     let (mut added, mut skipped) = (0, 0);
     for t in correct::split_terms(&text) {
         if exist.contains(&t.to_lowercase()) {
             skipped += 1;
         } else {
-            app.db.insert("INSERT INTO lexicon(term) VALUES(?)", &[&t]).map_err(e)?;
+            app.db.insert("INSERT INTO lexicon(term,book_id) VALUES(?,?)", &[&t, &book_id]).map_err(e)?;
             added += 1;
         }
     }
@@ -218,15 +276,15 @@ pub fn lexicon_delete(app: State<App>, ids: Vec<i64>) -> R<()> {
     Ok(())
 }
 
-/// 试一试：用设置里的纠错模型，以词表为依据纠正一句话（无上下文）。
+/// 试一试：用设置里的纠错模型，以指定词库的词条为依据纠正一句话（无上下文）。
 #[tauri::command]
-pub async fn lexicon_test(app: State<'_, App>, text: String) -> R<String> {
+pub async fn lexicon_test(app: State<'_, App>, book_id: i64, text: String) -> R<String> {
     let s = Settings::load(&app.db);
     if s.api_key.is_empty() {
         return Err("未配置百炼密钥".into());
     }
     let llm = Llm::new(s.llm_url(), s.api_key.clone());
-    let terms = session::load_terms(&app.db);
+    let terms: Vec<String> = app.db.query("SELECT term FROM lexicon WHERE book_id=? AND enabled=1 ORDER BY id", &[&book_id]).map_err(e)?.iter().filter_map(|r| r["term"].as_str().map(String::from)).collect();
     let timeout = s.correct_timeout_ms.max(5000);
     Ok(correct::context_correct(&llm, &s.correct_model, &s.correct_strength, &terms, &[], &text, timeout).await.unwrap_or(text))
 }
@@ -235,22 +293,38 @@ pub async fn lexicon_test(app: State<'_, App>, text: String) -> R<String> {
 
 #[tauri::command]
 pub fn templates_list(app: State<App>) -> R<Vec<Value>> {
-    app.db.query("SELECT id,name,task,output_req,filters,interval_min,builtin FROM templates ORDER BY id", &[]).map_err(e)
+    let rows = app.db.query("SELECT id,name,task,output_req,filters,interval_min,builtin,(SELECT group_concat(book_id) FROM template_books WHERE template_id=templates.id) AS bids FROM templates ORDER BY id", &[]).map_err(e)?;
+    Ok(rows
+        .into_iter()
+        .map(|mut r| {
+            let bids: Vec<i64> = r["bids"].as_str().unwrap_or("").split(',').filter_map(|x| x.parse().ok()).collect();
+            r["book_ids"] = json!(bids);
+            r.as_object_mut().unwrap().remove("bids");
+            r
+        })
+        .collect())
 }
 
 #[tauri::command]
-pub fn template_save(app: State<App>, id: Option<i64>, name: String, task: String, output_req: String, filters: String, interval_min: i64) -> R<i64> {
+pub fn template_save(app: State<App>, id: Option<i64>, name: String, task: String, output_req: String, filters: String, interval_min: i64, book_ids: Option<Vec<i64>>) -> R<i64> {
     if name.trim().is_empty() {
         return Err("模板名称不能为空".into());
     }
     let interval = interval_min.clamp(1, 60);
-    match id {
+    let id = match id {
         Some(id) => {
             app.db.exec("UPDATE templates SET name=?,task=?,output_req=?,filters=?,interval_min=? WHERE id=?", &[&name, &task, &output_req, &filters, &interval, &id]).map_err(e)?;
-            Ok(id)
+            id
         }
-        None => app.db.insert("INSERT INTO templates(name,task,output_req,filters,interval_min) VALUES(?,?,?,?,?)", &[&name, &task, &output_req, &filters, &interval]).map_err(e),
+        None => app.db.insert("INSERT INTO templates(name,task,output_req,filters,interval_min) VALUES(?,?,?,?,?)", &[&name, &task, &output_req, &filters, &interval]).map_err(e)?,
+    };
+    if let Some(bids) = book_ids {
+        app.db.exec("DELETE FROM template_books WHERE template_id=?", &[&id]).map_err(e)?;
+        for b in bids {
+            app.db.exec("INSERT OR IGNORE INTO template_books(template_id,book_id) VALUES(?,?)", &[&id, &b]).map_err(e)?;
+        }
     }
+    Ok(id)
 }
 
 #[tauri::command]
@@ -260,6 +334,7 @@ pub fn template_delete(app: State<App>, id: i64) -> R<()> {
         return Err("至少保留一个模板".into());
     }
     app.db.exec("DELETE FROM templates WHERE id=?", &[&id]).map_err(e)?;
+    app.db.exec("DELETE FROM template_books WHERE template_id=?", &[&id]).map_err(e)?;
     Ok(())
 }
 

@@ -209,3 +209,6 @@ del{color:var(--bad);text-decoration:line-through;text-decoration-thickness:1px;
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){*,#app::before{animation:none!important;transition:none!important}}
 @media (prefers-reduced-transparency:reduce){.main,.tb{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--solid)}#app::after{display:none}}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+button.chip{cursor:pointer;transition:background .2s,color .2s}
+.chip.on{background:var(--gobg);color:var(--gofg);border-color:transparent;box-shadow:0 8px 20px -10px var(--glow)}

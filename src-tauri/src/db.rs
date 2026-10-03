@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS lexicon (
   id INTEGER PRIMARY KEY AUTOINCREMENT, term TEXT NOT NULL, misspellings TEXT NOT NULL DEFAULT '',
   weight TEXT NOT NULL DEFAULT 'mid', enabled INTEGER NOT NULL DEFAULT 1, note TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS lexicon_books (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS template_books (
+  template_id INTEGER NOT NULL, book_id INTEGER NOT NULL, PRIMARY KEY(template_id, book_id)
+);
 "#;
 
 impl Db {
@@ -52,6 +58,7 @@ impl Db {
         let db = Db(Mutex::new(conn));
         db.seed()?;
         db.merge_legacy_templates()?;
+        db.migrate_lexicon_books()?;
         Ok(db)
     }
 
@@ -83,6 +90,18 @@ impl Db {
             }
             let id = r["id"].as_i64().unwrap_or(0);
             self.exec("UPDATE templates SET task=?, output_req='', filters='[]' WHERE id=?", &[&task, &id])?;
+        }
+        Ok(())
+    }
+
+    /// 旧版只有一个词库：给词条加上所属词库，并把未归属的词条收进「默认词库」（不绑定模板，即所有模板通用）。
+    fn migrate_lexicon_books(&self) -> Result<()> {
+        if !self.query("PRAGMA table_info(lexicon)", &[])?.iter().any(|c| c["name"] == "book_id") {
+            self.exec("ALTER TABLE lexicon ADD COLUMN book_id INTEGER NOT NULL DEFAULT 0", &[])?;
+        }
+        if self.one("SELECT id FROM lexicon WHERE book_id=0 LIMIT 1", &[])?.is_some() {
+            let id = self.insert("INSERT INTO lexicon_books(name) VALUES('默认词库')", &[])?;
+            self.exec("UPDATE lexicon SET book_id=? WHERE book_id=0", &[&id])?;
         }
         Ok(())
     }

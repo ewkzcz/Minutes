@@ -10,7 +10,9 @@ const db = {
     { id: 1, name: '面试复盘与评分', task: '你是一名资深技术面试记录员……', output_req: '1. 整体总结\n2. 分维度打分\n3. 筛选结果', filters: JSON.stringify([{ cond: '3 年以上后端经验', method: '候选人自述年限 ≥ 3', weight: '必须' }]), interval_min: 5, builtin: 1 },
     { id: 2, name: '项目周会纪要', task: '你是项目周会记录员。', output_req: '1. 概要\n2. 待办', filters: '[]', interval_min: 5, builtin: 1 },
   ],
-  lexicon: [{ id: 1, term: 'Kafka', enabled: 1 }, { id: 2, term: '灰度发布', enabled: 1 }],
+  books: [{ id: 1, name: '后端技术', enabled: 1 }, { id: 2, name: '团队成员', enabled: 1 }],
+  binds: [[1, 1]], // [template_id, book_id]
+  lexicon: [{ id: 1, book_id: 1, term: 'Kafka', enabled: 1 }, { id: 2, book_id: 1, term: '灰度发布', enabled: 1 }, { id: 3, book_id: 2, term: '张三丰', enabled: 1 }],
   sessions: [
     { id: 1, title: '后端工程师 · 二面', started_at: now - 3600e3, duration_ms: 3480e3, status: 'done', pinned: 1, favorite: 1, template_name: '面试复盘与评分', report: '### 1. 整体总结\n候选人 4 年后端经验，主导消息平台迁移至 **Kafka**（日均 2 亿条）。\n\n### 2. 维度打分\n\n| 维度 | 评分 | 证据 |\n|---|---|---|\n| 技术深度 | 4.5 | “分区按订单号哈希” |\n| 系统设计 | 4.0 | “先灰度百分之五” |\n\n### 3. 筛选\n- 3 年以上后端经验：**符合**', asr_model: 'qwen-audio-3.1-asr-flash-streaming', llm_model: 'qwen3.8-flash' },
     { id: 2, title: '产品评审周会', started_at: now - 86400e3, duration_ms: 2100e3, status: 'done', pinned: 0, favorite: 0, template_name: '项目周会纪要', report: '本周评审三个需求，结论见待办。', asr_model: 'qwen-audio-3.1-asr-flash-streaming', llm_model: 'qwen3.8-flash' },
@@ -51,12 +53,17 @@ export async function mockCall(cmd, a = {}) {
     case 'get_settings': return { settings: db.settings, asr_models: ['qwen-audio-3.1-asr-flash-streaming', 'qwen-audio-3.0-asr-flash-streaming', 'fun-asr-realtime'], llm_models: ['qwen3.8-flash', 'qwen3.7-flash-2026-07-15', 'qwen-plus', 'qwen-max', 'qwen-turbo'], devices: ['MacBook 麦克风', 'USB 会议麦'], active_session: null };
     case 'save_settings': Object.assign(db.settings, a.values); return;
     case 'test_connection': return { asr: { ok: true }, llm: { ok: false, error: '模拟：未连接真实后端' } };
-    case 'templates_list': return db.templates;
-    case 'template_save': { if (a.id) Object.assign(db.templates.find((t) => t.id === a.id), { name: a.name, task: a.task, output_req: a.outputReq, filters: a.filters, interval_min: a.intervalMin }); else db.templates.push({ id: ++nid, name: a.name, task: a.task, output_req: a.outputReq, filters: a.filters, interval_min: a.intervalMin, builtin: 0 }); return a.id || nid; }
+    case 'templates_list': return db.templates.map((t) => ({ ...t, book_ids: db.binds.filter(([tid]) => tid === t.id).map(([, b]) => b) }));
+    case 'template_save': { if (a.id) Object.assign(db.templates.find((t) => t.id === a.id), { name: a.name, task: a.task, output_req: a.outputReq, filters: a.filters, interval_min: a.intervalMin }); else db.templates.push({ id: ++nid, name: a.name, task: a.task, output_req: a.outputReq, filters: a.filters, interval_min: a.intervalMin, builtin: 0 }); const tid = a.id || nid; if (a.bookIds) db.binds = db.binds.filter(([t]) => t !== tid).concat(a.bookIds.map((b) => [tid, b])); return tid; }
     case 'templates_restore': return 0;
     case 'template_delete': db.templates = db.templates.filter((t) => t.id !== a.id); return;
-    case 'lexicon_list': return db.lexicon;
-    case 'lexicon_add': { const t = [...new Set(a.text.split(/[\r\n,，、;；\t]/).map((x) => x.trim()).filter(Boolean))]; const fresh = t.filter((x) => !db.lexicon.some((i) => i.term.toLowerCase() === x.toLowerCase())); fresh.forEach((term) => db.lexicon.unshift({ id: ++nid, term, enabled: 1 })); return [fresh.length, t.length - fresh.length]; }
+    case 'books_list': return db.books.map((b) => ({ ...b, n: db.lexicon.filter((x) => x.book_id === b.id).length, template_ids: db.binds.filter(([, x]) => x === b.id).map(([t]) => t) }));
+    case 'book_save': if (a.id) db.books.find((b) => b.id === a.id).name = a.name.trim(); else db.books.push({ id: ++nid, name: a.name.trim(), enabled: 1 }); return a.id || nid;
+    case 'book_toggle': db.books.find((b) => b.id === a.id).enabled = a.enabled ? 1 : 0; return;
+    case 'book_delete': db.books = db.books.filter((b) => b.id !== a.id); db.lexicon = db.lexicon.filter((x) => x.book_id !== a.id); db.binds = db.binds.filter(([, b]) => b !== a.id); return;
+    case 'book_bind': db.binds = db.binds.filter(([t, b]) => !(t === a.templateId && b === a.bookId)).concat(a.bound ? [[a.templateId, a.bookId]] : []); return;
+    case 'lexicon_list': return db.lexicon.filter((x) => x.book_id === a.bookId);
+    case 'lexicon_add': { const t = [...new Set(a.text.split(/[\r\n,，、;；\t]/).map((x) => x.trim()).filter(Boolean))]; const fresh = t.filter((x) => !db.lexicon.some((i) => i.book_id === a.bookId && i.term.toLowerCase() === x.toLowerCase())); fresh.forEach((term) => db.lexicon.unshift({ id: ++nid, book_id: a.bookId, term, enabled: 1 })); return [fresh.length, t.length - fresh.length]; }
     case 'lexicon_rename': db.lexicon.find((x) => x.id === a.id).term = a.term.trim(); return;
     case 'lexicon_toggle': db.lexicon.find((x) => x.id === a.id).enabled = a.enabled ? 1 : 0; return;
     case 'lexicon_delete': db.lexicon = db.lexicon.filter((x) => !a.ids.includes(x.id)); return;

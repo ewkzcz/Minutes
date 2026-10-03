@@ -1,6 +1,6 @@
 // 实时记录：开始页 + 录制页（实时转写 / 纠错 / 阶段纪要）。
 import { call, on, openWav } from '../api.js';
-import { S, isLive, elapsed } from '../state.js';
+import { S, isLive, elapsed, booksFor } from '../state.js';
 import { $, $$, esc, icon, fmtMs, toast, confirmBox } from '../ui.js';
 import { md } from '../md.js';
 import { segHtml } from '../diff.js';
@@ -36,12 +36,14 @@ function renderIdle() {
     <div class="i-right">
       <div class="row"><div class="eyebrow">提示词模板</div><div class="sp"></div><button class="btn sm" id="lvManage">查看 / 管理</button></div>
       <div class="tcards" id="lvTpls">${S.templates.map((t) => `<button class="tcard ${t.id === selTpl ? 'on' : ''}" data-id="${t.id}"><b>${esc(t.name)}</b><span>${esc((t.task || '').slice(0, 26) || '空白模板')} · ${t.interval_min} 分钟</span></button>`).join('')}</div>
+      <div class="row" style="gap:8px"><span class="cap" style="flex:none">专有词库</span><div class="chips" style="flex:1;min-width:0">${booksFor(selTpl).map((b) => `<span class="chip">${esc(b.name)} · ${b.n}</span>`).join('') || '<span class="cap">无</span>'}</div><button class="btn sm ghost" id="lvLex" style="flex:none">管理</button></div>
       <div class="grid2"><select class="inp" id="lvAsr" title="语音识别模型" style="padding-left:16px">${modelOpts(S.asrModels, S.cfg.asr_model)}</select><select class="inp" id="lvSum" title="总结模型" style="padding-left:16px">${modelOpts(S.llmModels, S.cfg.summary_model)}</select></div>
     </div></div>`;
   const save = (k) => (e) => call('save_settings', { values: { [k]: e.target.value } }).then(() => (S.cfg[k] = e.target.value));
   $('#lvAsr', root).onchange = save('asr_model');
   $('#lvSum', root).onchange = save('summary_model');
   $('#lvManage', root).onclick = () => S.go('templates');
+  $('#lvLex', root).onclick = () => S.go('lexicon');
   $('#lvTpls', root).onclick = (e) => { const c = e.target.closest('.tcard'); if (!c) return; S.cfg.templateId = Number(c.dataset.id); renderIdle(); };
   $('#lvSrc', root).onclick = (e) => { const b = e.target.closest('button'); if (!b) return; S.cfg.audio_source = b.dataset.s; call('save_settings', { values: { audio_source: b.dataset.s } }); $$('#lvSrc button', root).forEach((x) => x.classList.toggle('on', x === b)); };
   $('#lvStart', root).onclick = () => start(null);

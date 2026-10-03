@@ -34,7 +34,7 @@ async function boot() {
   S.asrModels = info.asr_models;
   S.llmModels = info.llm_models;
   S.devices = info.devices;
-  S.templates = await call('templates_list');
+  [S.templates, S.books] = await Promise.all([call('templates_list'), call('books_list')]);
   S.sessionCount = (await call('sessions_list', { query: '', onlyFav: false })).length;
   S.go = go;
   S.refreshNav = async () => { S.sessionCount = (await call('sessions_list', { query: '', onlyFav: false })).length; renderNav(); };

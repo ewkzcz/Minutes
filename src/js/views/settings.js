@@ -26,9 +26,9 @@ export function render(el) {
       <div class="kv"><div class="l"><span>纠错模型</span><span class="cap">选低延迟型号，超时自动放弃</span></div><div class="r"><select class="inp" data-k="correct_model">${opt(S.llmModels, c.correct_model)}</select></div></div>
       <div class="kv"><div class="l"><span>添加其他模型</span><span class="cap">输入百炼支持的对话模型名</span></div><div class="r"><input class="inp" id="sAddM" placeholder="如 qwen-plus-latest"><button class="btn" id="sAddB">添加</button></div></div></div>
     <div class="card sec"><div class="h3">实时纠错</div>
-      <div class="kv"><div class="l"><span>启用纠错</span><span class="cap">词库快速纠错 + 上下文纠错</span></div><div class="r"><button class="sw ${c.correct_enabled ? 'on' : ''}" id="sCorr" aria-label="启用纠错"></button></div></div>
+      <div class="kv"><div class="l"><span>启用纠错</span><span class="cap">模型结合上下文与专有词库纠错</span></div><div class="r"><button class="sw ${c.correct_enabled ? 'on' : ''}" id="sCorr" aria-label="启用纠错"></button></div></div>
       <div class="kv"><span>纠错强度</span><div class="r"><select class="inp" data-k="correct_strength">${optKV([['conservative', '保守：只改明显错误'], ['balanced', '适中'], ['aggressive', '积极：结合上下文改写']], c.correct_strength)}</select></div></div>
-      <div class="kv"><div class="l"><span>上下文纠错超时（毫秒）</span><span class="cap">超时保留词库纠错结果</span></div><div class="r"><input class="inp" type="number" min="500" max="10000" step="100" data-k="correct_timeout_ms" value="${c.correct_timeout_ms}"></div></div></div>
+      <div class="kv"><div class="l"><span>上下文纠错超时（毫秒）</span><span class="cap">超时保留原始识别结果</span></div><div class="r"><input class="inp" type="number" min="500" max="10000" step="100" data-k="correct_timeout_ms" value="${c.correct_timeout_ms}"></div></div></div>
     <div class="card sec"><div class="h3">输入与外观</div>
       <div class="kv"><div class="l"><span>音频来源</span><span class="cap">默认同时监听麦克风与耳机 / 扬声器里的系统声音</span></div><div class="r"><select class="inp" data-k="audio_source">${optKV([['both', '麦克风 + 系统声音'], ['mic', '仅麦克风'], ['system', '仅系统声音']], c.audio_source || 'both')}</select></div></div>
       <div class="kv"><span>麦克风</span><div class="r"><select class="inp" data-k="mic_device"><option value="">系统默认</option>${opt(S.devices, c.mic_device)}</select></div></div>

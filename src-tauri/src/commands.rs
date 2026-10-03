@@ -5,7 +5,7 @@ use crate::config::{Settings, DEFAULT_ASR_MODELS, DEFAULT_LLM_MODELS};
 use crate::db::Db;
 use crate::llm::Llm;
 use crate::session::{self, Engine};
-use crate::{audio, export};
+use crate::{audio, correct, export};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -175,22 +175,33 @@ pub fn session_markdown(app: State<App>, id: i64, opts: Value) -> R<String> {
 
 #[tauri::command]
 pub fn lexicon_list(app: State<App>) -> R<Vec<Value>> {
-    app.db.query("SELECT id,term,misspellings,weight,enabled,note FROM lexicon ORDER BY id DESC", &[]).map_err(e)
+    app.db.query("SELECT id,term,enabled FROM lexicon ORDER BY id DESC", &[]).map_err(e)
+}
+
+/// 批量添加：按换行、逗号、顿号、分号等分隔，已存在的词（英文忽略大小写）跳过。返回 [新增数, 跳过数]。
+#[tauri::command]
+pub fn lexicon_add(app: State<App>, text: String) -> R<(usize, usize)> {
+    let exist: Vec<String> = app.db.query("SELECT term FROM lexicon", &[]).map_err(e)?.iter().filter_map(|r| r["term"].as_str().map(str::to_lowercase)).collect();
+    let (mut added, mut skipped) = (0, 0);
+    for t in correct::split_terms(&text) {
+        if exist.contains(&t.to_lowercase()) {
+            skipped += 1;
+        } else {
+            app.db.insert("INSERT INTO lexicon(term) VALUES(?)", &[&t]).map_err(e)?;
+            added += 1;
+        }
+    }
+    Ok((added, skipped))
 }
 
 #[tauri::command]
-pub fn lexicon_save(app: State<App>, id: Option<i64>, term: String, misspellings: String, weight: String, note: String) -> R<i64> {
+pub fn lexicon_rename(app: State<App>, id: i64, term: String) -> R<()> {
     let term = term.trim().to_string();
     if term.is_empty() {
         return Err("专有词不能为空".into());
     }
-    match id {
-        Some(id) => {
-            app.db.exec("UPDATE lexicon SET term=?,misspellings=?,weight=?,note=? WHERE id=?", &[&term, &misspellings, &weight, &note, &id]).map_err(e)?;
-            Ok(id)
-        }
-        None => app.db.insert("INSERT INTO lexicon(term,misspellings,weight,note) VALUES(?,?,?,?)", &[&term, &misspellings, &weight, &note]).map_err(e),
-    }
+    app.db.exec("UPDATE lexicon SET term=? WHERE id=?", &[&term, &id]).map_err(e)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -207,10 +218,17 @@ pub fn lexicon_delete(app: State<App>, ids: Vec<i64>) -> R<()> {
     Ok(())
 }
 
+/// 试一试：用设置里的纠错模型，以词表为依据纠正一句话（无上下文）。
 #[tauri::command]
-pub fn lexicon_test(app: State<App>, text: String) -> String {
-    let m = crate::correct::Matcher::new(session::load_terms(&app.db));
-    m.correct(&text, &Settings::load(&app.db).correct_strength)
+pub async fn lexicon_test(app: State<'_, App>, text: String) -> R<String> {
+    let s = Settings::load(&app.db);
+    if s.api_key.is_empty() {
+        return Err("未配置百炼密钥".into());
+    }
+    let llm = Llm::new(s.llm_url(), s.api_key.clone());
+    let terms = session::load_terms(&app.db);
+    let timeout = s.correct_timeout_ms.max(5000);
+    Ok(correct::context_correct(&llm, &s.correct_model, &s.correct_strength, &terms, &[], &text, timeout).await.unwrap_or(text))
 }
 
 // ------------------------------------------------------------ 提示词模板

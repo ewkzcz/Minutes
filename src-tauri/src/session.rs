@@ -3,7 +3,7 @@
 use crate::asr::{self, AsrEvent, AsrParams, ConnEnd};
 use crate::audio;
 use crate::config::Settings;
-use crate::correct::{context_correct, Matcher, Term};
+use crate::correct::context_correct;
 use crate::db::Db;
 use crate::llm::Llm;
 use anyhow::{anyhow, Result};
@@ -86,16 +86,12 @@ impl Template {
     }
 }
 
-pub fn load_terms(db: &Db) -> Vec<Term> {
-    db.query("SELECT term,misspellings,weight FROM lexicon WHERE enabled=1 ORDER BY id", &[])
+/// 已启用的专有词，作为上下文纠错的依据。
+pub fn load_terms(db: &Db) -> Vec<String> {
+    db.query("SELECT term FROM lexicon WHERE enabled=1 ORDER BY id", &[])
         .unwrap_or_default()
         .iter()
-        .map(|r| Term {
-            term: r["term"].as_str().unwrap_or("").to_string(),
-            misspellings: r["misspellings"].as_str().unwrap_or("").split(|c| c == '\n' || c == ',' || c == '，' || c == '、').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
-            weight: r["weight"].as_str().unwrap_or("mid").to_string(),
-        })
-        .filter(|t| !t.term.is_empty())
+        .filter_map(|r| r["term"].as_str().map(str::trim).filter(|t| !t.is_empty()).map(String::from))
         .collect()
 }
 
@@ -148,7 +144,7 @@ struct Ctx {
     emit: Emitter,
     llm: Llm,
     settings: Settings,
-    matcher: Matcher,
+    terms: Vec<String>,
     sid: i64,
     template: Template,
     model: Arc<Mutex<String>>,
@@ -163,14 +159,13 @@ impl Ctx {
     }
 
     fn on_partial(&self, text: &str) {
-        let t = if self.settings.correct_enabled { self.matcher.correct(text, &self.settings.correct_strength) } else { text.to_string() };
-        (self.emit)("asr-partial", json!({"text": t}));
+        (self.emit)("asr-partial", json!({"text": text}));
     }
 
     fn on_final(self: &Arc<Self>, raw: String, begin_ms: i64, end_ms: i64) {
         let cs = &self.settings;
-        let fast = if cs.correct_enabled { self.matcher.correct(&raw, &cs.correct_strength) } else { raw.clone() };
-        let stage = if fast != raw { "lexicon" } else { "raw" };
+        let fast = raw.clone();
+        let stage = "raw";
         let seq = self.seq.fetch_add(1, Ordering::SeqCst) + 1;
         let id = match self.db.insert(
             "INSERT INTO segments(session_id,seq,begin_ms,end_ms,raw,text,stage) VALUES(?,?,?,?,?,?,?)",
@@ -195,7 +190,7 @@ impl Ctx {
                 .filter_map(|r| r["text"].as_str().map(String::from))
                 .collect();
             let cs = &ctx.settings;
-            let ans = context_correct(&ctx.llm, &cs.correct_model, &cs.correct_strength, &ctx.matcher.terms, &history, &fast, cs.correct_timeout_ms).await;
+            let ans = context_correct(&ctx.llm, &cs.correct_model, &cs.correct_strength, &ctx.terms, &history, &fast, cs.correct_timeout_ms).await;
             let (text, stage) = match ans {
                 Some(c) => (c, "context"),
                 None => (fast.clone(), stage),
@@ -352,7 +347,7 @@ impl Engine {
             db: self.db.clone(),
             emit: self.emit.clone(),
             llm: Llm::new(settings.llm_url(), settings.api_key.clone()),
-            matcher: Matcher::new(load_terms(&self.db)),
+            terms: load_terms(&self.db),
             settings,
             sid,
             template,

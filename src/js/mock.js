@@ -10,7 +10,7 @@ const db = {
     { id: 1, name: '面试复盘与评分', task: '你是一名资深技术面试记录员……', output_req: '1. 整体总结\n2. 分维度打分\n3. 筛选结果', filters: JSON.stringify([{ cond: '3 年以上后端经验', method: '候选人自述年限 ≥ 3', weight: '必须' }]), interval_min: 5, builtin: 1 },
     { id: 2, name: '项目周会纪要', task: '你是项目周会记录员。', output_req: '1. 概要\n2. 待办', filters: '[]', interval_min: 5, builtin: 1 },
   ],
-  lexicon: [{ id: 1, term: 'Kafka', misspellings: '卡夫卡', weight: 'mid', enabled: 1, note: '' }, { id: 2, term: '灰度发布', misspellings: '', weight: 'high', enabled: 1, note: '' }],
+  lexicon: [{ id: 1, term: 'Kafka', enabled: 1 }, { id: 2, term: '灰度发布', enabled: 1 }],
   sessions: [
     { id: 1, title: '后端工程师 · 二面', started_at: now - 3600e3, duration_ms: 3480e3, status: 'done', pinned: 1, favorite: 1, template_name: '面试复盘与评分', report: '### 1. 整体总结\n候选人 4 年后端经验，主导消息平台迁移至 **Kafka**（日均 2 亿条）。\n\n### 2. 维度打分\n\n| 维度 | 评分 | 证据 |\n|---|---|---|\n| 技术深度 | 4.5 | “分区按订单号哈希” |\n| 系统设计 | 4.0 | “先灰度百分之五” |\n\n### 3. 筛选\n- 3 年以上后端经验：**符合**', asr_model: 'qwen-audio-3.1-asr-flash-streaming', llm_model: 'qwen3.8-flash' },
     { id: 2, title: '产品评审周会', started_at: now - 86400e3, duration_ms: 2100e3, status: 'done', pinned: 0, favorite: 0, template_name: '项目周会纪要', report: '本周评审三个需求，结论见待办。', asr_model: 'qwen-audio-3.1-asr-flash-streaming', llm_model: 'qwen3.8-flash' },
@@ -56,7 +56,8 @@ export async function mockCall(cmd, a = {}) {
     case 'templates_restore': return 0;
     case 'template_delete': db.templates = db.templates.filter((t) => t.id !== a.id); return;
     case 'lexicon_list': return db.lexicon;
-    case 'lexicon_save': { if (a.id) Object.assign(db.lexicon.find((x) => x.id === a.id), { term: a.term, misspellings: a.misspellings, weight: a.weight }); else db.lexicon.unshift({ id: ++nid, term: a.term, misspellings: a.misspellings, weight: a.weight, enabled: 1, note: '' }); return 1; }
+    case 'lexicon_add': { const t = [...new Set(a.text.split(/[\r\n,，、;；\t]/).map((x) => x.trim()).filter(Boolean))]; const fresh = t.filter((x) => !db.lexicon.some((i) => i.term.toLowerCase() === x.toLowerCase())); fresh.forEach((term) => db.lexicon.unshift({ id: ++nid, term, enabled: 1 })); return [fresh.length, t.length - fresh.length]; }
+    case 'lexicon_rename': db.lexicon.find((x) => x.id === a.id).term = a.term.trim(); return;
     case 'lexicon_toggle': db.lexicon.find((x) => x.id === a.id).enabled = a.enabled ? 1 : 0; return;
     case 'lexicon_delete': db.lexicon = db.lexicon.filter((x) => !a.ids.includes(x.id)); return;
     case 'lexicon_test': return a.text.replace('卡夫卡', 'Kafka');

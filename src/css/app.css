@@ -154,7 +154,7 @@ del{color:var(--bad);text-decoration:line-through;text-decoration-thickness:1px;
 .md th,.md td{border-bottom:1px solid var(--line);padding:10px 15px;text-align:left;vertical-align:top}.md tr:last-child td{border-bottom:0}.md th{background:var(--surf2);color:var(--t1);font-weight:700}
 .md hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 /* 历史 */
-.tool{display:flex;align-items:center;gap:12px}
+.tool{display:flex;align-items:center;gap:12px}.tool>h2.h{flex:none;white-space:nowrap}
 .search{position:relative;flex:1}.search svg{position:absolute;left:20px;top:14px;color:var(--t3)}.search .inp{padding-left:48px}
 .list{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:2px 2px 6px}
 .item{display:flex;align-items:center;gap:16px;padding:18px 24px;border-radius:30px;background:var(--card);border:1.5px solid var(--line);cursor:pointer;position:relative;transition:transform .35s var(--ease),border-color .2s,background .2s}

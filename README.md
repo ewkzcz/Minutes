@@ -1,119 +1,186 @@
+<p align="center">
+  <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?style=for-the-badge&logo=tauri&logoColor=white">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-stable-B7410E?style=for-the-badge&logo=rust&logoColor=white">
+  <img alt="百炼" src="https://img.shields.io/badge/%E7%99%BE%E7%82%BC-ASR%20%2B%20LLM-FF6A00?style=for-the-badge">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-14.6%2B-000000?style=for-the-badge&logo=apple&logoColor=white">
+</p>
+
 # Minutes
 
-实时会议语音纪要桌面应用：麦克风语音经百炼流式识别（ASR）后实时纠错，每隔 N 分钟由大模型做阶段性整理，会议结束生成最终总结；转写、纠错、总结全部保存在本机，可查询、置顶、收藏、导出。全部功能在桌面端进程内完成，没有独立服务端。
+实时会议纪要工具，**把会议写成笔记**。
 
-## 一、项目组成
+一边开会一边出字：会议声音实时转成文字，AI 结合上下文和专有词库纠正识别错误，每隔几分钟整理一段阶段纪要，散会时按你写的提示词生成最终总结。录音不落盘，转写、纪要、总结都存在本机，可以搜索、收藏、导出。
 
-### 1、目录
 
-| 目录 / 文件 | 内容 |
-|---|---|
-| `src-tauri/` | 桌面端后端：Rust + Tauri 2，负责麦克风采集、百炼 ASR / 对话模型调用、纠错、阶段整理、SQLite 存储 |
-| `src/` | 前端：原生 HTML / CSS / ES Module（无框架、无构建步骤），窗口 900×600，明 / 暗主题 |
-| `docs/UI设计.pdf` | UI 设计文档（暗色 / 浅色界面、实现方案、设计令牌） |
-| `design/` | UI 设计源文件与生成 PDF 的脚本（`build.py`） |
-| `.env` / `.env.example` | 百炼密钥与业务空间 ID（`.env` 不入库，独立于其他项目） |
 
-### 2、后端模块（`src-tauri/src/`）
+## 一、功能说明
 
-| 模块 | 负责什么 |
-|---|---|
-| `audio` | cpal 0.18 采集：麦克风、系统声音（对默认输出设备做回环，耳机 / 扬声器里播放的会议声音自动被监听）或两者混音，重采样为 16k 单声道 PCM16，每 100ms 一包；系统声音不可用时自动降级为仅麦克风；暂停时发送静音保持连接；也可读取 WAV 文件按实时速度回放 |
-| `asr` | 百炼实时语音识别 WebSocket（`run-task` / `finish-task`），输出 partial 与 final 句；断线由会话层自动重连 |
-| `correct` | 上下文纠错：最近对话与专有词表一并交给低延迟模型，由模型判断并改正（超时或改动过大即放弃）；词表只作纠错依据，不做机械替换 |
-| `llm` | 百炼 OpenAI 兼容对话接口客户端 |
-| `session` | 会话编排：识别 → 纠错 → 定时阶段整理 → 结束后最终总结；提示词模板组装 |
-| `db` | SQLite（WAL）：设置、会议、转写片段、阶段纪要、词库与词条、模板与词库绑定 |
-| `export` | 导出总结 / 阶段纪要 / 纠错后转写 / ASR 原始转写 / 纠错对照 |
-| `commands` | 前端调用的全部命令 |
+| 页面 | 能做什么 |
+| --- | --- |
+| 实时记录 | 选提示词模板和模型后开始录制；转写逐字出现，纠错处高亮，可在「纠错后 / 对照 / 原始」三种视图间切换；音量波形、下次整理倒计时、阶段纪要实时追加；暂停、立即整理、结束，录制中可换总结模型 |
+| 历史会议 | 按标题、转写、阶段纪要、总结全文搜索；全部 / 收藏筛选、置顶、收藏、批量删除；详情含总结、阶段纪要、纠错后转写、原始转写、逐处对照；改标题、换模型重新生成总结、导出 Markdown 或复制 |
+| 专有词库 | 按会议类型建多个词库，各自启用 / 停用，绑定到提示词模板；词条一行一个，或用逗号、顿号、分号分隔批量粘贴，自动去重；「试一试」用纠错模型预览效果 |
+| 提示词模板 | 一份系统提示词写清会议主题、记录重点和最终输出要求；设置整理间隔、勾选绑定的词库；预置「面试复盘与评分」「项目周会纪要」「通用会议纪要」 |
+| 设置 | 百炼密钥与连接测试；识别、总结、纠错模型切换，可添加任意百炼对话模型；纠错开关、强度与超时；音频来源、麦克风、浅色 / 深色主题 |
 
-### 3、前端页面（`src/js/views/`）
+音频来源默认是**麦克风 + 系统声音**：自己说的话和耳机里线上会议对方的声音会一起转写。
 
-| 页面 | 功能 |
-|---|---|
-| 实时记录 | 选模板与模型后开始；逐字出现的转写、纠错高亮（纠错后 / 对照 / 原始三种视图）、音量波形、下次整理倒计时、阶段纪要；暂停、立即整理、结束；录制中可切换总结模型 |
-| 历史会议 | 关键词查询（标题、转写、阶段纪要、总结）、全部 / 收藏筛选、置顶、收藏、单个删除、多选批量删除；详情含总结、阶段纪要、纠错后转写、原始转写、对照；改标题、换模型重新生成总结、导出 / 复制 |
-| 专有词库 | 可建多个词库，各自启用 / 停用，并绑定提示词模板（也可在模板页绑定）；录制时使用已启用、且绑定了当前模板或未绑定任何模板（通用）的词库；词条批量添加（一行一个，或用逗号 / 顿号 / 分号分隔，自动去重）、编辑、启用、删除；“试一试”调用纠错模型预览效果 |
-| 提示词模板 | 绑定专有词库、主题任务（系统提示词）、最终输出要求、筛选条件表、整理间隔；预置 面试复盘与评分 / 项目周会纪要 / 通用会议纪要 |
-| 设置 | 百炼密钥与连接测试、模型切换（可自添模型）、纠错开关 / 强度 / 超时、麦克风、主题 |
 
-## 二、运行
 
-### 1、环境
+## 二、工作原理
 
-需要 Rust（stable）与 Node.js（仅用于 Tauri CLI）。
-
-```bash
-cd Minutes
-npm install
-cp .env.example .env      # 填写 BAILIAN_API_KEY，可选 BAILIAN_WORKSPACE_ID
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#3498DB','primaryTextColor':'#FFFFFF','primaryBorderColor':'#2980B9','lineColor':'#7F8C8D','textColor':'#2C3E50','edgeLabelBackground':'#FFFFFF','fontSize':'15px','fontFamily':'Hiragino Sans GB, Helvetica Neue, Arial, sans-serif'}}}%%
+flowchart LR
+  A["麦克风 + 系统声音<br/>16k 单声道 PCM"] --> B["流式识别<br/>partial / final 句"]
+  B --> C["上下文纠错<br/>最近 12 句 + 专有词表"]
+  C --> D["阶段整理<br/>每 N 分钟一段"]
+  D --> E["最终总结<br/>按模板输出要求"]
+  L["专有词库<br/>按模板选取"] -.-> C
+  T["提示词模板"] -.-> D
+  T -.-> E
+  classDef clsStep fill:#3498DB,stroke:#2980B9,color:#FFFFFF
+  classDef clsSrc fill:#9B59B6,stroke:#8E44AD,color:#FFFFFF
+  classDef clsKey fill:#E67E22,stroke:#D35400,color:#FFFFFF
+  class A,B,C,D clsStep
+  class L,T clsSrc
+  class E clsKey
 ```
 
-`.env` 启动时依次从当前目录、可执行文件目录、应用数据目录读取；应用「设置」里填写的值优先于 `.env`。
+- **采集**：同时采集麦克风和系统声音（对默认输出设备做回环），混音后重采样为 16k 单声道 PCM16，每 100ms 一包发给识别服务；暂停时发送静音保持连接，系统声音不可用时自动只用麦克风。
+- **识别**：百炼流式语音识别（WebSocket），未说完的 partial 句实时显示，说完的 final 句写库；连接断开自动重连。
+- **纠错**：每个 final 句先以原文立即显示，同时异步交给低延迟对话模型。模型的依据有两样：最近 12 句对话的上下文，和本场会议的专有词表。超时（默认 2.5 秒）或改动幅度超过上限就保留原文，不会把句子改得面目全非。
+- **阶段整理**：每隔模板设定的分钟数（默认 5），把这段新增转写连同前几段阶段纪要交给总结模型，按模板提示词整理成要点；失败了下次会带上累积内容重试。
+- **最终总结**：结束录制后先等纠错收尾，整理最后一段，再依据全部阶段纪要（转写不长时附上全文）按模板的输出要求生成总结。
+- **存储**：ASR 原始转写和纠错后文本分开保存，可以分别导出，也能导出逐处标注的纠错对照。
+
+
+
+### 专有词库怎么参与纠错
+
+语音识别常把专有名词识别成读音相近的字，或者英文的中文音译，比如把 Kafka 识别成「卡夫卡」，把「灰度发布」识别成「辉度发布」。同音、近音的写法太多，一个个列误写去机械替换是做不全的，也容易误伤。
+
+所以词库只是**交给纠错模型的参考依据**，和上下文并列：模型看到句子里某处结合上下文明显指的是词表里的词，才改成词表写法；读音或语义对不上就不动。把「卡夫卡」改成「Kafka」这类字数变化大的修改，不计入改动幅度上限。
+
+每场会议用哪些词库，由所选模板决定：
+
+| 词库状态 | 是否参与 |
+| --- | --- |
+| 已启用，绑定了当前模板 | 参与 |
+| 已启用，未绑定任何模板 | 参与（通用词库，所有模板都用） |
+| 已启用，只绑定了其他模板 | 不参与 |
+| 已停用 | 不参与 |
+
+绑定关系在词库页和模板页都能改，两边看到的是同一份。
+
+
+
+## 三、目录结构
+
+```text
+Minutes/
+├── src-tauri/                桌面端后端：Rust + Tauri 2
+│   ├── src/
+│   │   ├── audio.rs          麦克风 / 系统声音采集、混音、重采样；WAV 文件回放
+│   │   ├── asr.rs            百炼流式语音识别 WebSocket
+│   │   ├── correct.rs        上下文纠错、词表分词
+│   │   ├── llm.rs            百炼 OpenAI 兼容对话接口
+│   │   ├── session.rs        会话编排：识别 → 纠错 → 阶段整理 → 最终总结；按模板选取词表
+│   │   ├── db.rs             SQLite（WAL）：设置、会议、转写、阶段纪要、词库、模板与绑定
+│   │   ├── export.rs         Markdown 导出
+│   │   └── commands.rs       前端调用的命令
+│   └── examples/             采集自检、无界面联调
+├── src/                      前端：原生 HTML / CSS / ES Module，无框架、无构建步骤
+│   ├── js/views/             五个页面：实时记录、历史会议、专有词库、提示词模板、设置
+│   └── js/mock.js            浏览器预览用的模拟后端
+├── design/                   UI 设计源文件与生成 PDF 的脚本
+├── docs/UI设计.pdf            UI 设计文档：明暗界面、实现方案、设计令牌
+└── assets/                   README 截图
+```
+
+
+
+## 四、界面
+
+**实时记录**：转写逐字出现，纠错处带下划线高亮
+
+<img src="assets/screen-live.webp" width="800" alt="实时记录页：录制中的转写与纠错高亮">
+
+**历史会议**：总结、阶段纪要、两版转写与对照
+
+<img src="assets/screen-history.webp" width="800" alt="历史会议详情页：最终总结">
+
+**专有词库**：多个词库，各自启用并绑定模板
+
+<img src="assets/screen-lexicon.webp" width="800" alt="专有词库页：词库列表、模板绑定与词条">
+
+**提示词模板**：一份系统提示词，勾选绑定的词库
+
+<img src="assets/screen-templates.webp" width="800" alt="提示词模板页：模板编辑与词库绑定">
+
+
+
+## 五、安装、配置和使用
+
+### 安装
+
+需要 Rust（stable）和 Node.js（用于 Tauri CLI）。
+
+```bash
+npm install
+npm run build     # 产物在 src-tauri/target/release/bundle/
+```
+
+开发时用 `npm run dev` 直接运行。语音识别和总结走云端，应用本身不带模型，打包后约 4 MB。
+
+macOS 首次录制会请求「麦克风」和「系统音频录制」两项权限；采集系统声音需要 macOS 14.6 及以上。
+
+
+
+### 配置
+
+在应用「设置」里填百炼密钥即可。也可以写进 `.env`（参考 `.env.example`），启动时依次从当前目录、可执行文件目录、应用数据目录读取，设置里填的值优先：
 
 | 变量 | 说明 |
-|---|---|
+| --- | --- |
 | `BAILIAN_API_KEY` | 百炼密钥 |
 | `BAILIAN_WORKSPACE_ID` | 可选，业务空间 ID；填了走 `{id}.cn-beijing.maas.aliyuncs.com`，否则走 `dashscope.aliyuncs.com` |
 
-### 2、开发与打包
+默认模型：
 
-```bash
-npm run dev       # 开发运行（macOS 麦克风权限会弹给启动它的终端 / 应用）
-npm run build     # 打包，产物在 src-tauri/target/release/bundle/
-```
+| 能力 | 默认型号 | 可选 |
+| --- | --- | --- |
+| 语音识别（流式） | `qwen-audio-3.1-asr-flash-streaming` | `qwen-audio-3.0-asr-flash-streaming`、`fun-asr-realtime` |
+| 阶段整理 / 最终总结 | `qwen3.8-flash` | `qwen3.7-flash-2026-07-15`、`qwen-plus`、`qwen-max`、`qwen-turbo`，以及在设置里添加的任意百炼对话模型 |
+| 上下文纠错 | `qwen3.7-flash-2026-07-15` | 同上，选低延迟型号 |
 
-实测 macOS（Apple 芯片）：`.app` 约 4.3 MB，`.dmg` 约 2.4 MB。语音识别与总结走云端，因此没有内置模型。
 
-### 3、测试
+
+### 使用
+
+1. 到「专有词库」新建词库，把会议里常出现的人名、产品名、术语整段粘贴进去；需要的话绑定到对应模板。
+2. 到「提示词模板」选一个预置模板，或者自己写一份系统提示词，说明会议主题、要记什么、最后要输出什么。
+3. 回到「实时记录」，选模板，点「开始录制」。模板卡片下方会列出这场会议要用的词库。
+4. 结束后在「历史会议」查看总结，不满意可以换模型重新生成，再导出 Markdown。
+
+
+
+### 开发与调试
 
 ```bash
 cd src-tauri
-cargo test --lib                                      # 纠错单元测试
-cargo run --example capture -- system                # 音频采集自检：播放声音时应看到 peak 明显大于 0
-cargo run --example headless -- /path/to/16k.wav 22   # 无界面联调：WAV → 识别 → 纠错 → 阶段整理 → 总结（会产生少量费用）
+cargo test --lib                                      # 单元测试：词表分词、改动幅度、词库选取与旧数据迁移
+cargo run --example capture -- system                # 音频采集自检：播放声音时 peak 应明显大于 0
+cargo run --example headless -- /path/to/16k.wav 22   # 无界面联调：WAV → 识别 → 纠错 → 阶段整理 → 总结
 ```
 
-生成测试音频（macOS）：
+`npm run preview` 在浏览器里打开界面（`http://localhost:1420`），后端由 `src/js/mock.js` 模拟。
 
-```bash
-say -v Tingting "面试官问，你们线上的消息队列是怎么选型的" -o a.aiff && afconvert -f WAVE -d LEI16@16000 -c 1 a.aiff a.wav
-```
 
-浏览器预览界面（不含后端，使用 `src/js/mock.js` 模拟数据）：
 
-```bash
-npm run preview   # 打开 http://localhost:1420
-```
-
-## 三、处理流程
-
-1. 麦克风 → 16k PCM → 百炼流式 ASR，partial 实时显示，final 句写库。
-2. final 句先以原始识别结果立即展示，再异步交给纠错模型，以最近 12 句上下文和专有词表为依据纠正；超时（默认 2.5 秒）或改动幅度超过上限（改成词表写法的部分不计入）则保留原文。
-3. 每隔模板设定的分钟数（默认 5），把这段新增转写连同最近 3 段阶段纪要交给总结模型，按模板的主题任务与筛选条件整理；失败则下次带着累积内容重试。
-4. 结束后等待纠错收尾，整理最后一段，再依据阶段纪要（转写不长时附全文）与“最终输出要求”生成总结，含筛选条件逐条判定。
-5. ASR 原始转写与纠错后文本分别保存，可分别导出，并可导出逐处对照。
-
-### 百炼型号
-
-| 能力 | 默认型号 | 可选 |
-|---|---|---|
-| 语音识别（流式） | `qwen-audio-3.1-asr-flash-streaming` | `qwen-audio-3.0-asr-flash-streaming`、`fun-asr-realtime` |
-| 阶段整理 / 最终总结 | `qwen3.8-flash` | `qwen3.7-flash-2026-07-15`、`qwen-plus`、`qwen-max`、`qwen-turbo`，设置中可添加任意百炼对话模型 |
-| 上下文纠错 | `qwen3.7-flash-2026-07-15` | 同上，建议低延迟型号 |
-
-只做识别与对话，不含语音合成，也不支持打断。
-
-## 四、数据与隐私
+## 六、数据与隐私
 
 | 数据 | 位置 |
-|---|---|
-| 会议、转写、阶段纪要、词库、模板、设置 | 应用数据目录下的 `meeting.db`（macOS：`~/Library/Application Support/com.meetingnotes.app/`） |
-| 音频 | 不落盘，仅流式发送到你配置的百炼服务 |
-
-## 五、已知限制
-
-- 系统声音采集在 macOS 需要 14.6 及以上，并在首次录制时授权「系统音频录制」；Windows 走 WASAPI 回环；Linux 未验证。系统声音与麦克风混在同一路转写，不区分说话人。
-- 阶段整理与总结为非流式返回，长会议生成总结需数十秒。
-- 「转写 WAV 文件」仅支持 16k 单声道 16 位 PCM WAV，用于演示与联调。
-- `fun-asr-realtime` 的参数按同一协议发送，未逐一实测。
+| --- | --- |
+| 会议、转写、阶段纪要、总结、词库、模板、设置 | 应用数据目录下的 `meeting.db`（macOS：`~/Library/Application Support/com.meetingnotes.app/`） |
+| 音频 | 不落盘，只以流的形式发送到你配置的百炼服务 |

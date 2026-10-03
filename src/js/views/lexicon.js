@@ -41,7 +41,7 @@ function paintBook() {
       <div class="chips" id="lbTpls">${S.templates.map((t) => `<button class="chip ${cur.template_ids.includes(t.id) ? 'on' : ''}" data-t="${t.id}">${esc(t.name)}</button>`).join('')}</div>
       <span class="cap">${cur.template_ids.length ? '只在使用已绑定模板的会议里生效' : '未绑定任何模板：所有模板的会议都会使用这个词库'}</span></div>
     <div class="row" style="gap:8px"><div class="search" style="flex:1">${icon('search')}<input class="inp" id="lxQ" placeholder="搜索词条" value="${esc(q)}"></div><span class="cap" id="lxCnt"></span><button class="btn pri" id="lxAdd">${icon('plus')}添加词条</button></div>
-    <div class="card row" style="padding:8px 10px;gap:8px;flex:none"><input class="inp" id="lxTest" placeholder="试一试：输入一句带识别错误的话，用纠错模型参照本词库纠正（如：我们用卡夫卡做队列）" style="flex:1"><button class="btn" id="lxGo">测试</button></div>
+    <div class="card row" style="padding:8px 10px;gap:8px;flex:none"><input class="inp" id="lxTest" placeholder="试一试：如「我们用卡夫卡做队列」" style="flex:1"><button class="btn" id="lxGo">测试</button></div>
     <div id="lxRes" class="cap" style="min-height:0"></div>
     <div class="card scroll" style="flex:1;min-height:220px"><table class="tbl"><thead><tr><th>专有词</th><th>启用</th><th></th></tr></thead><tbody id="lxBody"></tbody></table></div>`;
   bindBook();
@@ -146,7 +146,7 @@ function bindBook() {
 export function render(el) {
   root = el; q = '';
   root.innerHTML = `<div class="view">
-    <div class="tool"><h2 class="h">专有词库</h2><span class="cap">每个词库可单独启用，并绑定到提示词模板；录制时使用已启用的、绑定了当前模板或通用的词库</span></div>
+    <div class="tool"><h2 class="h">专有词库</h2><span class="cap">按会议类型分库，绑定到提示词模板；录制时只用已启用、且属于当前模板或通用的词库</span></div>
     <div class="split">
       <div class="tpl-list"><button class="btn pri" data-a="new">${icon('plus')}新建词库</button><div id="lbList" class="tpl-items"></div></div>
       <div class="form" id="lbPane"></div></div></div>`;
